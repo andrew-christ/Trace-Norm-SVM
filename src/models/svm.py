@@ -2,6 +2,8 @@ import numpy as np
 
 from sklearn.preprocessing import LabelEncoder
 
+from tdqm import tqdm
+
 class SVM:
 
     """Linear Multi-Class Support Vector Machine
@@ -40,11 +42,12 @@ class SVM:
     
     def fit(self, X, y):
         """
-        Fit the linear SVM model using training data.
+        Fit a multi-class linear SVM model using an ADMM-based 
+        optimization scheme.
 
         Parameters
         ----------
-        X : array-like of shape (n_samples, n_features)
+        X : ndarray of shape (n_samples, n_features)
             Training data matrix.
 
         y : array-like of shape (n_samples,)
@@ -54,6 +57,11 @@ class SVM:
         -------
         self : object
             Fitted estimator
+
+        Notes
+        -----
+        The ADMM-based implementation follows the Crammer-Singer
+        multi-class SVM formulation with hinge-loss constraints.
         """
 
         n, self.d   = X.shape
@@ -62,20 +70,44 @@ class SVM:
         y           = LabelEncoder().fit_transform(np.squeeze(y))
 
         # Number of classes
-        self.k      = len(np.unique(y))
+        self.k      = y.max() + 1
 
         # One-hot encoded labels for optimization
-        Y           = np.zeros((n, self.k))
+        Y = np.zeros((n, self.k))
         Y[np.arange(n), y] = 1
 
 
-        # Primal Variables
-        self.W      = np.zeros((self.d, self.k))
-        self.b      = np.zeros((1, self.k))
+        # ADMM primal Variables
+        self.W      = np.zeros((self.d, self.k))    # Weights
+        self.b      = np.zeros((1, self.k))         # Bias
 
-        self.Z      = np.zeros((n, self.k))
-        self.A      = np.zeros((n, self.k))
+        self.S      = np.zeros((n, self.k))         # Equality Constraint (Class Scores): S = WX + b
+        self.M      = np.zeros((n, self.k))         # Equality Constraint (Margins): M = 1 + S - S_{y_i}
 
-        # Dual Variables
+        # ADMM dual Variables
         self.U1     = np.zeros((n, self.k))
         self.U2     = np.zeros((n, self.k))
+
+        self.loss_hist = []
+
+        for _ in tqdm(range(self.max_iter), desc='Training SVM'):
+
+            # 1.) M-Update
+
+            # Select target class score: S_{y_i}
+            S_hat   = self.S[np.arange(n), y][:, np.newaxis]
+
+            # Compute margin violations
+            V       = 1 - Y + self.S - S_hat - self.U1 / self.rho
+
+            # Exclude target class from margin violations
+            mask = np.ones_like(V, dtype=bool)
+            mask[np.arange(n), y] = False
+            V_masked = V[mask].reshape(n, self.k - 1)
+
+            # Compute Crammer-Singer hinge proximal operator using dual
+            lam = self.dual_simplex_projection(V_masked)
+
+            # Primal update via KKT conditions of hinge proximal operator
+            self.M = np.zeros_like(V)
+            self.M[mask] = V[mask] - lam.ravel()
