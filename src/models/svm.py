@@ -67,3 +67,15 @@ class SVM:
         # One-hot encoded labels for optimization
         Y           = np.zeros((n, self.k))
         Y[np.arange(n), y] = 1
+
+
+        # Primal Variables
+        self.W      = np.zeros((self.d, self.k))
+        self.b      = np.zeros((1, self.k))
+
+        self.Z      = np.zeros((n, self.k))
+        self.A      = np.zeros((n, self.k))
+
+        # Dual Variables
+        self.U1     = np.zeros((n, self.k))
+        self.U2     = np.zeros((n, self.k))
