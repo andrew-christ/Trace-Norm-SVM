@@ -1,5 +1,7 @@
 import numpy as np
 
+from sklearn.preprocessing import LabelEncoder
+
 class SVM:
 
     """Linear Multi-Class Support Vector Machine
@@ -33,3 +35,35 @@ class SVM:
 
         assert self.C > 0, 'Regularization parameter must be strictly positive'
         assert self.rho > 0, 'Augmented Lagrangian penalty parameter must be strictly positive'
+
+
+    
+    def fit(self, X, y):
+        """
+        Fit the linear SVM model using training data.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Training data matrix.
+
+        y : array-like of shape (n_samples,)
+            Target labels relative to samples in X.
+
+        Returns
+        -------
+        self : object
+            Fitted estimator
+        """
+
+        n, self.d   = X.shape
+
+        # Convert arbitrary labels to integers in range [0, k-1]
+        y           = LabelEncoder().fit_transform(np.squeeze(y))
+
+        # Number of classes
+        self.k      = len(np.unique(y))
+
+        # One-hot encoded labels for optimization
+        Y           = np.zeros((n, self.k))
+        Y[np.arange(n), y] = 1
