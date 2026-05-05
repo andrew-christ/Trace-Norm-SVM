@@ -113,6 +113,17 @@ class SVM:
             self.M[mask] = V[mask] - lam.ravel()
 
 
+            # 2.) W-Update
+            self.W = np.linalg.solve(
+                1 / self.rho * np.eye(self.d) + X.T @ X,
+                X.T @ (self.S + self.U2 / self.rho - self.b)
+            )
+
+
+            # 3.) b-Update
+            self.b = np.mean(self.S + self.U2 - X @ self.W, axis=0, keepdims=True)
+
+
 
     def dual_simplex_projection(self, V):
         """
