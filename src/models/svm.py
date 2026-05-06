@@ -140,6 +140,22 @@ class SVM:
             self.S = self.solve_S_update(V - V_hat + S, y)
 
 
+            # 5.) U1-Update
+
+            # Select target class score: S_{y_i}
+            S_hat   = self.S[np.arange(n), y][:, np.newaxis]
+
+            # Update Dual Variable
+            self.U1 += self.rho * (self.M - (1 - Y + self.S - S_hat))
+
+
+            # 6.) U2-Update
+
+            # Update Dual Variable
+            self.U2 += self.rho * (self.S - (X @ self.W + self.b))
+
+        return self
+
     def dual_simplex_projection(self, V):
         """
         Project the rows of a matrix V onto the simplex
