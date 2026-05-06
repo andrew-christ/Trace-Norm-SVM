@@ -154,6 +154,10 @@ class SVM:
             # Update Dual Variable
             self.U2 += self.rho * (self.S - (X @ self.W + self.b))
 
+
+            # Append to loss history
+            self.loss_hist.append(self._loss(X, y))
+
         return self
     
     def predict(self, X, return_scores=False):
@@ -316,3 +320,56 @@ class SVM:
         S[np.arange(n), y] += (q_sum[:, 0] - k * q_y[:, 0]) / (2 * (k+1))
 
         return S
+    
+
+    def _loss(self, X, y):
+        """
+        Compute the Crammer-Singer multi-class SVM objective function.
+
+        The loss is defined as:
+
+            L(W) = ||W||_F^2 + C * sum_i^n max_{k ≠ y_i} [1 + S_{i, k} - S_{i, y_i}]_+
+
+        where:
+            - S_{i, k} = (XW + b)_{i,k} is the score for class k
+            - [·]_+ = max(·, 0) is the hinge function
+
+        This corresponds to the multi-class hinge loss using the 
+        Crammer-Singer formulation with L2 regularization.
+
+        Parameters
+        ----------
+        X : ndarray of shape (n_samples, n_features)
+            Input data matrix.
+
+        y : ndarray of shape (n_samples,)
+            Target labels relative to samples in X.
+
+        Returns
+        -------
+        float
+            Value of objective function (L2 regularization + hinge loss)
+
+        """
+
+        n, d = X.shape
+
+        # Class scores S = XW + b
+        scores = X @ self.W + self.b
+
+        # Extract correct class scores S_{i, y_i}
+        correct_scores = scores[np.arange(n), y]
+
+        # Compute margins: 1 + S_{i, k} - S_{i, y_i}
+        margins = 1 + scores - correct_scores[:, np.newaxis]
+
+        # Exclude correct class from loss
+        margins[np.arange(n), y] = 0
+
+        # Maximum hinge violation per sample
+        hinge = np.maximum(margins, 0).max(axis=1)
+
+        # Sum of squares regularization term
+        sos = np.linalg.norm(self.W, 'fro')**2
+
+        return sos + self.C * hinge.sum()
