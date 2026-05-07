@@ -2,7 +2,7 @@ import numpy as np
 
 from sklearn.preprocessing import LabelEncoder
 
-from tdqm import tqdm
+from tqdm import tqdm
 
 class SVM:
 
