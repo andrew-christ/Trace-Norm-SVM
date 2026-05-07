@@ -88,7 +88,11 @@ class SVM:
         self.U1     = np.zeros((n, self.k))
         self.U2     = np.zeros((n, self.k))
 
-        self.loss_hist = []
+        self.history = {
+            "loss": [],
+            "primal_residual": [],
+            "dual_residual": []
+        }
 
         for _ in tqdm(range(self.max_iter), desc='Training SVM'):
 
@@ -156,7 +160,7 @@ class SVM:
 
 
             # Append to loss history
-            self.loss_hist.append(self._loss(X, y))
+            self.history["loss"].append(self._loss(X, y))
 
         return self
     
