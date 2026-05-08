@@ -20,20 +20,28 @@ def parse_args():
 def main():
     args = parse_args()
 
+
+    fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(12, 10))
+
+    # 
     X, y = SyntheticDataset.linear()
 
     clf = SVM(args.C, args.rho, args.max_iter)
-
     clf.fit(X, y)
 
-    fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(12, 5))
+    plot_boundary(clf, X, y, ax[0, 0])
+    plot_loss(clf, ax[0, 1])
 
-    plot_boundary(clf, X, y, ax[0])
 
-    plot_loss(clf, ax[1])
+    # 
+    X, y = SyntheticDataset.gaussian(n_classes=5)
+
+    clf = SVM(args.C, args.rho, args.max_iter)
+    clf.fit(X, y)
+
+    plot_boundary(clf, X, y, ax[1, 0])
+    plot_loss(clf, ax[1, 1])
     
-    print("done")
-
     plt.tight_layout()
     plt.show()
 

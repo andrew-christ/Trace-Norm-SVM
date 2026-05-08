@@ -374,6 +374,6 @@ class SVM:
         hinge = np.maximum(margins, 0).max(axis=1)
 
         # Sum of squares regularization term
-        sos = np.linalg.norm(self.W, 'fro')**2
+        sos = 0.5 * np.linalg.norm(self.W, 'fro')**2
 
         return sos + self.C * hinge.sum()
