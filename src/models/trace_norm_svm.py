@@ -41,9 +41,81 @@ class TraceNormSVM:
         assert self.C > 0, 'Regularization parameter must be strictly positive'
         assert self.rho > 0, 'Augmented Lagrangian penalty parameter must be strictly positive'
 
+
+    def dual_simplex_projection(self, V):
+        """
+        Project the rows of a matrix V onto the simplex
+        with radius 𝜏.
+
+        Specifically, for each row v, compute the solution to:
+
+            min_x   ||x - v||_2^2
+            s.t.    x >= 0, sum(x) <= 𝜏
+
+        where 𝜏 = C / rho. This corresponds to the dual of
+        the hinge proximal operator
+
+            min_{m, t}  ||m - v||_2^2 + 𝜏t
+            s.t.        x_i <= t    ∀i
+
+        which is used in this implementation of the
+        Crammer-Singer hinge loss function.
+
+        Parameters
+        ----------
+        V : ndarray of shape (n_samples, n_classes - 1)
+            Matrix where rows correspond to margin 
+            violation for non-target classes.
+        
+        Returns
+        -------
+        ndarray of shape (n_samples, n_classes - 1)
+            Row-wise projection of V onto the simplex.
+        
+        Notes
+        -----
+        Row that already satisfy the simplex constraints 
+        are left unchanged. This methods uses an efficient 
+        sorting-based projection algorithm from  
+        Duchi, John, et al. (2008)
+        
+        """
+
+        n, k = V.shape
+
+        # Upper bound of simplex
+        tau     = self.C / self.rho
+
+        # Threshold classes that already satisfy margin
+        V_pos   = np.maximum(V, 0)
+
+        # Identify rows that violate the simplex constraint (sum > 𝜏)
+        mask    = (V_pos.sum(axis=1) > tau)[:, np.newaxis]
+
+        # Sort each row in descending order
+        U       = np.sort(V, axis=1)[:, ::-1]
+
+        # Calculate cumulative sum of each sorted vector
+        cssv    = np.cumsum(U, axis=1)
+
+        # Condition that determines which elements are active
+        ind     = np.arange(k) + 1
+        cond    = U - (cssv - tau) / ind > 0
+
+        # Largest index such that projection condition is satisfied
+        p       = cond.sum(axis=1) - 1
+
+        # Calculate the offset theta
+        theta   = (cssv[np.arange(n), p] - tau) / (p + 1)
+        theta   = theta[:, np.newaxis]
+
+        # Shrink the rows that violate the simplex upper bound, then threshold
+        return np.maximum(np.where(mask, V - theta, V), 0)
+
+
     def solve_S_update(self, Q, y):
         """
-        Solve the S-subproblem in the ADMM formulation of 
+        Solves the S-subproblem in the ADMM formulation of 
         Crammer-Singer SVM.
 
         The subproblem applies a class-dependent linear operator 
@@ -94,6 +166,7 @@ class TraceNormSVM:
         S[np.arange(n), y] += (q_sum[:, 0] - k * q_y[:, 0]) / (2 * (k+1))
 
         return S
+
 
     def _loss(self, X, y):
         """
