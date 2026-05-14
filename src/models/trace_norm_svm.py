@@ -78,6 +78,144 @@ class TraceNormSVM:
         return self.le.inverse_transform(np.argmax(X @ self.W + self.b, axis=1))
 
 
+    def fit(self, X, y):
+        """
+        Fit a multi-class linear SVM model using an ADMM-based 
+        optimization scheme.
+
+        Parameters
+        ----------
+        X : ndarray of shape (n_samples, n_features)
+            Training data matrix.
+
+        y : array-like of shape (n_samples,)
+            Target labels relative to samples in X.
+
+        Returns
+        -------
+        self : object
+            Fitted estimator
+
+        Notes
+        -----
+        The ADMM-based implementation follows the Crammer-Singer
+        multi-class SVM formulation with hinge-loss constraints.
+        """
+
+        n, self.d   = X.shape
+
+        # Convert arbitrary labels to integers in range [0, k-1]
+        self.le     = LabelEncoder()
+        y           = self.le.fit_transform(np.squeeze(y))
+
+        # Number of classes
+        self.k      = y.max() + 1
+
+        # One-hot encoded labels for optimization
+        Y = np.zeros((n, self.k))
+        Y[np.arange(n), y] = 1
+
+
+        # ADMM primal Variables
+        self.W      = np.zeros((self.d, self.k))    # Weights
+        self.b      = np.zeros((1, self.k))         # Bias
+
+        self.S      = np.zeros((n, self.k))         # Equality Constraint (Class Scores): S = WX + b
+        self.M      = np.zeros((n, self.k))         # Equality Constraint (Margins): M = 1 + S - S_{y_i}
+        self.T      = np.zeros((self.d, self.k))
+
+        # ADMM dual Variables
+        self.U1     = np.zeros((n, self.k))
+        self.U2     = np.zeros((n, self.k))
+        self.U3     = np.zeros((self.d, self.k))
+
+        self.history = {
+            "loss": [],
+            "primal_residual": [],
+            "dual_residual": []
+        }
+
+        for _ in tqdm(range(self.max_iter), desc='Training Trace Norm SVM'):
+
+            # 1.) M-Update
+
+            # Select target class score: S_{y_i}
+            S_hat   = self.S[np.arange(n), y][:, np.newaxis]
+
+            # Compute margin violations
+            V       = 1 - Y + self.S - S_hat - self.U1 / self.rho
+
+            # Exclude target class from margin violations
+            mask = np.ones_like(V, dtype=bool)
+            mask[np.arange(n), y] = False
+            V_masked = V[mask].reshape(n, self.k - 1)
+
+            # Compute Crammer-Singer hinge proximal operator using dual
+            lam     = self.dual_simplex_projection(V_masked)
+
+            # Primal update via KKT conditions of hinge proximal operator
+            self.M = np.zeros_like(V)
+            self.M[mask] = V[mask] - lam.ravel()
+
+
+            # 2.) W-Update
+            self.W = np.linalg.solve(
+                np.eye(self.d) + X.T @ X,
+                X.T @ (self.S + self.U2 / self.rho - self.b) + (self.T + self.U3 / self.rho)
+            )
+
+
+            # 3.) b-Update
+            self.b = np.mean(self.S + self.U2 - X @ self.W, axis=0, keepdims=True)
+
+
+            # 4.) S-Update
+
+            # Margin violation with dual correction
+            V = self.M + self.U1 / self.rho - 1 - Y
+
+            # Linear model prediction with dual correction
+            S = X @ self.W + self.b - self.U2 / self.rho
+
+            # Removes target-class coupling contribution induced by margin constraints
+            V_hat = np.zeros((n, self.k))
+            V_hat[np.arange(n), y] = np.sum(V, axis=1)
+
+            # Solve structured linear subproblem for S using closed-form operator
+            self.S = self.solve_S_update(V - V_hat + S, y)
+
+
+            # 5.) T-Update
+
+            self.T = self.nuclear_prox(self.W - self.U3 / self.rho)
+
+
+            # 6.) U1-Update
+
+            # Select target class score: S_{y_i}
+            S_hat   = self.S[np.arange(n), y][:, np.newaxis]
+
+            # Update Dual Variable
+            self.U1 += self.rho * (self.M - (1 - Y + self.S - S_hat))
+
+
+            # 7.) U2-Update
+
+            # Update Dual Variable
+            self.U2 += self.rho * (self.S - (X @ self.W + self.b))
+
+            # 8.) U3-Update
+
+            # Update Dual Variable
+            self.U3 += self.rho * (self.T - self.W)
+
+
+            # Append to loss history
+            self.history["loss"].append(self._loss(X, y))
+
+        return self
+
+
     def dual_simplex_projection(self, V):
         """
         Project the rows of a matrix V onto the simplex
