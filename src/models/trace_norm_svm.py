@@ -42,6 +42,42 @@ class TraceNormSVM:
         assert self.rho > 0, 'Augmented Lagrangian penalty parameter must be strictly positive'
 
 
+    def predict(self, X, return_scores=False):
+        """
+        Compute predictions using multi-class linear SVM.
+
+        Class scores are of the form:
+
+            S = XW + b
+
+        where each entry S_{i,k} represents the score for
+        class k for sample i.
+
+        Parameters
+        ----------
+        X : ndarray of shape (n_samples, n_features)
+            Training data matrix.
+
+        return_scores : bool, default=False
+            If True, returns raw class scores instead of predicted labels
+
+        Returns
+        -------
+        ndarray
+            If return_scores=True:
+                of shape (n_samples, n_classes)
+
+            Otherwise:
+                of shape (n_samples,)
+
+        """
+
+        if return_scores:
+            return X @ self.W + self.b
+        
+        return self.le.inverse_transform(np.argmax(X @ self.W + self.b, axis=1))
+
+
     def dual_simplex_projection(self, V):
         """
         Project the rows of a matrix V onto the simplex
