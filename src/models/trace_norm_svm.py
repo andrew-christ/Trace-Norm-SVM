@@ -29,6 +29,12 @@ class TraceNormSVM:
 
     max_iter : int, default=1000
         Maximum number of ADMM iterations
+
+    References
+    ----------
+        [1] Amit, Yonatan, et al. "Uncovering shared structures in 
+            multiclass classification." Proceedings of the 24th 
+            international conference on Machine learning. 2007.
     
     """
 
@@ -98,8 +104,9 @@ class TraceNormSVM:
 
         Notes
         -----
-        The ADMM-based implementation follows the Crammer-Singer
-        multi-class SVM formulation with hinge-loss constraints.
+        The ADMM-based implementation follows the trace-norm multi-class 
+        SVM formulation with hinge-loss constraints in [1].
+        
         """
 
         n, self.d   = X.shape
@@ -250,8 +257,13 @@ class TraceNormSVM:
         -----
         Row that already satisfy the simplex constraints 
         are left unchanged. This methods uses an efficient 
-        sorting-based projection algorithm from  
-        Duchi, John, et al. (2008)
+        sorting-based projection algorithm from [2].
+
+        References
+        ----------
+            [2] Duchi, John, et al. "Efficient projections onto the L1-ball 
+                for learning in high dimensions." Proceedings of the 25th 
+                international conference on Machine learning. 2008.
         
         """
 
@@ -355,7 +367,7 @@ class TraceNormSVM:
             - [·]_+ = max(·, 0) is the hinge function
 
         This corresponds to the multi-class hinge loss using the 
-        Crammer-Singer formulation with trace-norm regularization.
+        Crammer-Singer formulation with trace-norm regularization [3].
 
         Parameters
         ----------
@@ -369,6 +381,12 @@ class TraceNormSVM:
         -------
         float
             Value of objective function (Trace-norm regularization + hinge loss)
+
+        References
+        ----------
+            [3] Crammer, Koby, and Yoram Singer. "On the algorithmic implementation 
+                of multiclass kernel-based vector machines." Journal of machine 
+                learning research 2. Dec (2001): 265-292.
 
         """
 
@@ -424,12 +442,12 @@ class TraceNormSVM:
 
         Notes
         -----
-        This is also known as Singular Value Thresholding (SVT) [1],
+        This is also known as Singular Value Thresholding (SVT) [4],
         commonly used in matrix completion and low-rank regularization.
 
         References
         ----------
-            [1] Cai, Jian-Feng, Emmanuel J. Candès, and Zuowei Shen. 
+            [4] Cai, Jian-Feng, Emmanuel J. Candès, and Zuowei Shen. 
                 "A singular value thresholding algorithm for matrix completion." 
                 SIAM Journal on optimization 20.4 (2010): 1956-1982
 
