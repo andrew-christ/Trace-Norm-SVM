@@ -41,6 +41,59 @@ class TraceNormSVM:
         assert self.C > 0, 'Regularization parameter must be strictly positive'
         assert self.rho > 0, 'Augmented Lagrangian penalty parameter must be strictly positive'
 
+    def solve_S_update(self, Q, y):
+        """
+        Solve the S-subproblem in the ADMM formulation of 
+        Crammer-Singer SVM.
+
+        The subproblem applies a class-dependent linear operator 
+        that couples the class scores with the margin violations. 
+        For each sample i, the update corresponds to the closed-form
+        application of the inverse of:
+
+            (I + B_{y_i}^T B_{y_i})^{-1}
+        
+        This inverse operator can be computed in closed form 
+        without explicity forming the matrix.
+
+        Parameters
+        ----------
+        Q : ndarray of shape (n_samples, n_classes)
+            Input matrix representing coupling of margin
+            violations and class scores.
+
+        y : array-like of shape (n_samples,)
+            Target labels in {0, ..., k-1}, which determines the 
+            structure of the inverse operator applied per row.
+
+        Returns
+        -------
+        S : ndarray of shape (n_samples, n_classes)
+            Updated S variable after solving structured subproblem.
+
+        Notes
+        -----
+        Implementation avoids explicit matrix inversion for 
+        efficiency. S is the auxiliary class-score variable
+        introduced by ADMM splitting.
+        
+        """
+
+        n, k = Q.shape
+
+        # Sum over all classes
+        q_sum = np.sum(Q, axis=1, keepdims=True)
+
+        # Extract target class per sample
+        q_y = Q[np.arange(n), y][:, np.newaxis]
+
+        S = 0.5 * Q
+
+        S += (q_y + q_sum) / (2 * (k+1))
+
+        S[np.arange(n), y] += (q_sum[:, 0] - k * q_y[:, 0]) / (2 * (k+1))
+
+        return S
 
     def _loss(self, X, y):
         """
